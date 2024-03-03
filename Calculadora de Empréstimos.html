@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+    <head>
+
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300&display=swap" rel="stylesheet">
+        <title> Calculadora de Empréstimos</title>
+        
+        <style>
+            body {
+              font-family: 'Oswald', sans-serif;
+            }
+
+            .output { 
+              font-weight: bolt; 
+            }               
+            #payment { 
+              text-decoration: underline; 
+            }     
+            #graph { 
+              margin-top: 5%;
+              border-radius: 5px;
+              background: #faf4f4;
+              box-shadow:  20px 20px 60px #afabab,
+              -20px -20px 60px #ffffff; 
+            }        
+            th, td { 
+              vertical-align: top; 
+            }              /* Não centraliza células da tabela */
+
+            button {
+              font-family: 'Oswald', sans-serif;
+              font-size: medium;
+              border:1px solid #d8d8d8;
+              width: 200px;
+              height: 30px;
+              border-radius: 6px;
+              background: linear-gradient(145deg, #f8f8f8, #d1d1d1);
+              box-shadow:  10px 10px 60px #a2a2a2,
+              -20px -20px 60px #ffffff;
+              margin-bottom: 10%;
+            }
+
+            button:hover {
+              box-shadow: 0 0 40px #a2a2a2;
+            }
+
+        </style>
+    </head>
+    <body>
+      
+        <!-- Esta é uma tabela HTML com elementos <input> que permitem ao usuário inserir dados e elementos <span>
+             nos quais o programa pode exibir seus resultados. Esses elementos têm identificações como "interest"
+             e "years". Essas identificações são usadas no código Javascript que vem após a tabela. Note que alguns
+             dos elementos de entrada definem rotinas de tratamento de eventos "onchange" ou "onclick". Elas
+             especificam strings de código Javascript a ser executado quando o usuário insere dados ou dá um clique.
+        -->
+
+
+        
+<table style="position: fixed; display: inline-flex; width: 50%; height: 100%; left: 0; top: 0; padding-left: 5%;">
+  <tr><th style=" position: sticky; padding-top: 2%; padding-bottom: 20%; width: 100%;">Inserir dados do empréstimo:</th>
+	</tr>
+	<tr style="padding-top: 10%;"><td>Valor do empréstimo (R$):</td>
+	<td><input id="amount" onchange="calculate();"></td>
+	</tr>
+	<tr><td>Juros Anuais (%):</td>
+	  <td><input id="apr" onchange="calculate();"></td></tr>
+	<tr><td>Prazo de reembolso (anos):</td>
+	  <td><input id="years" onchange="calculate();"></td>
+	<tr><td style="color: transparent">CEP (para encontrar credores):</td>
+	  <td><imput id="zipcode" onchange="calculate();"></td>   
+	<tr><th>Pagamentos aproximados:</th>
+	  <td><button onclick="calculate();">Calcular</button></td></tr>
+	<tr><td>Pagamento mensal:</td>
+	  <td>R$<span class="output" id="payment"></span></td></tr>
+	<tr><td>Pagamento total:</td>
+	  <td>R$<span class="output" id="total"></span></td></tr>
+	<tr><td>Total de juros:</td>
+	  <td>R$<span class="output" id="totalinterest"></span></td></tr>
+	<tr><th style="color: transparent">Patrocinadores:</th><td colspan=2 style="color: transparent">
+        Peça o seu empréstimo a um destes credores:
+	    <div id="lenders"></div></td></tr> </div></table>
+    <table style="position: fixed; display: inline-flex; width: 50%; height: 100%; right: 0; top: 0;">
+	<td><th style="position: fixed; padding-right: 0; top: 3%; text-align: center; width: 50%;">Saldo do Empréstimo, Capital Cumulativo e Juros</th></td><td rowspan=8>
+	  <canvas id="graph" width="500%" height="250%" style="margin: 20% 20%;"></canvas></td>
+  </table>
+    <!-- O restante deste exemplo é código Javascript na marca <script> a seguir-->
+    <!-- Normalmente, este script ficaria na marca <head> do documento acima, mas
+    é mais fácil entende-lo aqui, depois de ter visto seu contexto HTML.-->
+
+    <script>
+        function calculate() {
+  // Pesquisa os elementos de entrada e saída no documento
+  var amount = document.getElementById("amount");
+  var apr = document.getElementById("apr");
+  var years = document.getElementById("years");
+  var zipcode = document.getElementById("zipcode");
+  var payment = document.getElementById("payment");
+  var total = document.getElementById("total");
+  var totalinterest = document.getElementById("totalinterest");
+  
+// Obtém a entrada do usuário através dos elementos de entrada. Presume que tudo isso é válido.
+// Converte os juros de porcentagem para decimais e converte de taxa anual para taxa mensal.
+// Converte o período de pagamento em anos para o número de pagamentos mensais.
+var principal = parseFloat(amount.value);
+var interest = parseFloat(apr.value) / 100 / 12;
+var payments = parseFloat(years.value) * 12;
+  
+// Agora calcula o valor do pagamento mensal.
+var x = Math.pow(1 + interest, payments); //Math.pow calcula potencias
+var monthly = (principal*x*interest)/(x-1);
+
+// Se o resultado é um número finito, a entrada do usuário estava correta e temos resultados significativos para exibir
+if (isFinite(monthly)){
+  // Preencher os campos de saída, arredondando para 2 casas decimais
+  payment.innerHTML = monthly.toFixed(2);
+  total.innerHTML = (monthly * payments).toFixed(2);
+  totalinterest.innerHTML = ((monthly*payments)-principal).toFixed(2);
+  
+// Salva a entrada do usuário para que possamos recuperá-la na próxima vez que ele visitar
+ save(amount.value, apr.value, years.value, zipcode.value);
+
+ // Anúncio: localiza e exibe financeiras locais, mas ignora erros de rede
+ try { // Captura quaisquer erros que ocorram dentro destas chaves
+ getLenders(amount.value, apr.value, years.value, zipcode.value);
+ }
+  
+  catch(e) { /* E ignora esses erros */ }
+ // Por fim, traça o gráfico do saldo devedor, dos juros e dos pagamentos do capital
+ chart(principal, interest, monthly, payments);
+ }
+ else {
+ // O resultado foi Not-a-Number ou infinito, o que significa que a entrada
+ // estava incompleta ou era inválida. Apaga o conteúdo desses elementos.
+ payment.innerHTML = ""; // Apaga o conteúdo desses elementos
+ total.innerHTML = ""
+ totalinterest.innerHTML = "";
+ chart(); // Sem argumentos, apaga o gráfico
+ }
+}
+//  Salva a entrada do usuário como propriedades do objeto localStorage. Essas 
+//  propriedades ainda existirão quando o usuário visitar no futuro
+//  Esse recurso de armazenamento não vai funcionar em alguns navegadores
+//  ( o Firefox, por exemplo), se você executar o exemplo a partir de um arquivo
+//  local:// URL. Contudo, funciona com HTTP.   
+function save(amount, apr, years, zipcode) {
+ if (window.localStorage) { // Only do this if the browser supports it
+ localStorage.loan_amount = amount;
+ localStorage.loan_apr = apr;
+ localStorage.loan_years = years;
+ localStorage.loan_zipcode = zipcode;
+ }
+}
+// Tenta restaurar os campos de entrada automaticamente quando o documento é carregado pela primeira vez.
+window.onload = function() {
+ // Se o navegador suporta localStorage e temos alguns dados armazenados.
+ if (window.localStorage && localStorage.loan_amount) {
+ document.getElementById("amount").value = localStorage.loan_amount;
+ document.getElementById("apr").value = localStorage.loan_apr;
+ document.getElementById("years").value = localStorage.loan_years;
+ document.getElementById("zipcode").value = localStorage.loan_zipcode;
+ }
+};
+// Passa a entrada do usuário para um script no lado do servidor que (teoricamente) pode retornar
+// uma lista de links para financeiras locais interessadas em fazer empréstimos. Este exemplo
+// não contém uma implementação real desse serviço de busca de financeiras. Mas se o serviço
+// existisse, essa função funcionaria com ele.
+function getLenders(amount, apr, years, zipcode) {
+ // Se o navegador não suportar o objeto XMLHttpRequest, não faz nada
+ if (!window.XMLHttpRequest) return;
+ // Localiza o elemento para exibir a lista de financeiras
+ var ad = document.getElementById("lenders");
+ if (!ad) return; // Encerra se não há ponto de saída 
+  
+  // Encode the user's input as query parameters in a URL
+ var url = "getLenders.php" + // Service url plus
+ "?amt=" + encodeURIComponent(amount) + // user data in query string
+ "&apr=" + encodeURIComponent(apr) +
+ "&yrs=" + encodeURIComponent(years) +
+ "&zip=" + encodeURIComponent(zipcode);
+ // Codifica a entrada do usuário como parâmetros de consulta em um URL
+ var req = new XMLHttpRequest(); // Begin a new request
+ req.open("GET", url); // An HTTP GET request for the url
+ req.send(null); // Send the request with no body
+ // Before returning, register an event handler function that will be called
+ // at some later time when the HTTP server's response arrives. This kind of
+ // asynchronous programming is very common in client-side JavaScript.
+ req.onreadystatechange = function() {
+ if (req.readyState == 4 && req.status == 200) {
+ // If we get here, we got a complete valid HTTP response
+ var response = req.responseText; // HTTP response as a string
+ var lenders = JSON.parse(response); // Parse it to a JS array
+ // Convert the array of lender objects to a string of HTML
+ var list = "";
+ for(var i = 0; i < lenders.length; i++) {
+ list += "<li><a href='" + lenders[i].url + "'>" +
+ lenders[i].name + "</a>";
+ }
+ // Display the HTML in the element from above.
+ ad.innerHTML = "<ul>" + list + "</ul>";
+ }
+ }
+}
+
+// Chart monthly loan balance, interest and equity in an HTML <canvas> element.
+// If called with no arguments then just erase any previously drawn chart.
+function chart(principal, interest, monthly, payments) {
+ var graph = document.getElementById("graph"); // Get the <canvas> tag
+ graph.width = graph.width; // Magic to clear and reset the canvas element
+ // If we're called with no arguments, or if this browser does not support
+ // graphics in a <canvas> element, then just return now.
+ if (arguments.length == 0 || !graph.getContext) return;
+ // Get the "context" object for the <canvas> that defines the drawing API
+ var g = graph.getContext("2d"); // All drawing is done with this object
+ var width = graph.width, height = graph.height; // Get canvas size
+ // These functions convert payment numbers and dollar amounts to pixels
+ function paymentToX(n) { return n * width/payments; }
+ function amountToY(a) { return height-(a * height/(monthly*payments*1.05));}
+ // Payments are a straight line from (0,0) to (payments, monthly*payments)
+ g.moveTo(paymentToX(0), amountToY(0)); // Start at lower left
+ g.lineTo(paymentToX(payments), // Draw to upper right
+ amountToY(monthly*payments));
+  
+  g.lineTo(paymentToX(payments), amountToY(0)); // Down to lower right
+ g.closePath(); // And back to start
+ g.fillStyle = "#f88"; // Light red
+ g.fill(); // Fill the triangle
+ g.font = "bold 12px sans-serif"; // Define a font
+ g.fillText("Valor Total dos Juros", 20,20); // Draw text in legend
+ // Cumulative equity is non-linear and trickier to chart
+ var equity = 0;
+ g.beginPath(); // Begin a new shape
+ g.moveTo(paymentToX(0), amountToY(0)); // starting at lower-left
+ for(var p = 1; p <= payments; p++) {
+ // For each payment, figure out how much is interest
+ var thisMonthsInterest = (principal-equity)*interest;
+ equity += (monthly - thisMonthsInterest); // The rest goes to equity
+ g.lineTo(paymentToX(p),amountToY(equity)); // Line to this point
+ }
+ g.lineTo(paymentToX(payments), amountToY(0)); // Line back to X axis
+ g.closePath(); // And back to start point
+ g.fillStyle = "green"; // Now use green paint
+ g.fill(); // And fill area under curve
+ g.fillText("Valor do Empréstimo", 20,35); // Label it in green
+ // Loop again, as above, but chart loan balance as a thick black line
+ var bal = principal;
+ g.beginPath();
+ g.moveTo(paymentToX(0),amountToY(bal));
+ for(var p = 1; p <= payments; p++) {
+ var thisMonthsInterest = bal*interest;
+ bal -= (monthly - thisMonthsInterest); // The rest goes to equity
+ g.lineTo(paymentToX(p),amountToY(bal)); // Draw line to this point
+ }
+ g.lineWidth = 3; // Use a thick line
+ g.stroke(); // Draw the balance curve
+ g.fillStyle = "black"; // Switch to black text
+ g.fillText("Saldo do Empréstimo", 20,50); // Legend entry
+ // Now make yearly tick marks and year numbers on X axis
+ g.textAlign="center"; // Center text over ticks
+ var y = amountToY(0); // Y coordinate of X axis
+ for(var year=1; year*12 <= payments; year++) { // For each year
+ var x = paymentToX(year*12); // Compute tick position
+ g.fillRect(x-0.5,y-3,1,3); // Draw the tick
+ if (year == 1) g.fillText("Anos", x, y-5); // Label the axis
+ if (year % 5 == 0 && year*12 !== payments) // Number every 5 years
+ g.fillText(String(year), x, y-5);
+ }
+ // Mark payment amounts along the right edge
+ g.textAlign = "right"; // Right-justify text
+ g.textBaseline = "middle"; // Center it vertically
+ var ticks = [monthly*payments, principal]; // The two points we'll mark
+ var rightEdge = paymentToX(payments); // X coordinate of Y axis
+ for(var i = 0; i < ticks.length; i++) { // For each of the 2 points
+ var y = amountToY(ticks[i]); // Compute Y position of tick
+
+   g.fillRect(rightEdge-3, y-0.5, 3,1); // Draw the tick mark
+ g.fillText(String(ticks[i].toFixed(0)), // And label it.
+ rightEdge-5, y);
+ }
+} 
+  
+</script>
+</body>
+</html>
